@@ -1,0 +1,263 @@
+</div>
+</div>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cover Letter Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .input-section {
+            flex: 1;
+        }
+        
+        .output-section {
+            flex: 1;
+            position: sticky;
+            top: 20px;
+            align-self: flex-start;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        textarea {
+            height: 150px;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        #coverLetterText {
+            white-space: pre-wrap;
+            font-family: inherit;
+        }
+        
+        .copy-button {
+            margin-top: 10px;
+            background-color: #008CBA;
+        }
+        
+        .loading {
+            display: none;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .copy-success {
+            display: none;
+            color: #4CAF50;
+            font-size: 0.9em;
+            margin-left: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .copy-success.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Cover Letter Generator</h1>
+
+    <div class="container">
+        <div class="input-section">
+            <form id="coverLetterForm">
+                {% for field in fields.short_fields %}
+                <div class="form-group">
+                    <label for="{{ field|lower|replace(' ', '_') }}">{{ field }}:</label>
+                    <input type="text" id="{{ field|lower|replace(' ', '_') }}" name="{{ field|lower|replace(' ', '_') }}">
+                </div>
+                {% endfor %} {% for field in fields.long_fields %}
+                <div class="form-group">
+                    {% if field == 'Job Description' %}
+                    <div class="form-group">
+                        <label for="job_posting_url">Job Posting URL:</label>
+                        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                            <input type="text" id="job_posting_url" style="flex-grow: 1;" placeholder="Paste LinkedIn or other job board URL">
+                            <button type="button" id="fetch_job_description" style="flex-shrink: 0;">
+                                Fetch Description
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <label for="{{ field|lower|replace(' ', '_') }}">{{ field }}:</label>
+                    <textarea id="{{ field|lower|replace(' ', '_') }}" name="{{ field|lower|replace(' ', '_') }}"></textarea>
+                </div>
+                {% endfor %}
+
+                <button type="submit">Generate Cover Letter</button>
+            </form>
+        </div>
+
+        <div class="output-section">
+
+            <div id="loading" class="loading">
+                Generating cover letter...
+            </div>
+
+            <div id="result">
+                <h2>Generated Cover Letter</h2>
+                <div style="display: flex; align-items: center;">
+                    <button id="copyButton" class="copy-button">Copy to Clipboard</button>
+                    <span id="copySuccess" class="copy-success">✓ Copied!</span>
+                </div>
+                <div id="coverLetterText"></div>
+            </div>
+
+            <script>
+                // Function to fetch job description
+                async function fetchJobDescription() {
+                    const urlInput = document.getElementById('job_posting_url');
+                    const descriptionTextarea = document.getElementById('job_description');
+                    const url = urlInput.value.trim();
+
+                    if (!url) {
+                        alert('Please enter a job posting URL');
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/fetch-job-description', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                url: url
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            descriptionTextarea.value = data.description;
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    } catch (error) {
+                        alert('Error fetching job description: ' + error);
+                    }
+                }
+
+                // Add click handler for fetch button
+                document.getElementById('fetch_job_description').addEventListener('click', fetchJobDescription);
+
+                // Add enter key handler for URL input
+                document.getElementById('job_posting_url').addEventListener('keypress', async(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault(); // Prevent form submission
+                        await fetchJobDescription();
+                    }
+                });
+
+                document.getElementById('coverLetterForm').addEventListener('submit', async(e) => {
+                    e.preventDefault();
+
+                    const loading = document.getElementById('loading');
+                    const result = document.getElementById('result');
+                    const coverLetterText = document.getElementById('coverLetterText');
+
+                    loading.style.display = 'block';
+                    result.style.display = 'none';
+
+                    const formData = new FormData(e.target);
+
+                    try {
+                        const response = await fetch('/generate', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            coverLetterText.textContent = data.cover_letter;
+                            result.style.display = 'block';
+                        } else {
+                            alert('Error: ' + data.error);
+                        }
+                    } catch (error) {
+                        alert('Error generating cover letter: ' + error);
+                    } finally {
+                        loading.style.display = 'none';
+                    }
+                });
+
+                document.getElementById('copyButton').addEventListener('click', () => {
+                    const coverLetterText = document.getElementById('coverLetterText').textContent;
+                    const copySuccess = document.getElementById('copySuccess');
+                    
+                    navigator.clipboard.writeText(coverLetterText)
+                        .then(() => {
+                            copySuccess.style.display = 'inline';
+                            copySuccess.classList.add('show');
+                            setTimeout(() => {
+                                copySuccess.classList.remove('show');
+                                setTimeout(() => {
+                                    copySuccess.style.display = 'none';
+                                }, 300);
+                            }, 2000);
+                        })
+                        .catch(err => alert('Error copying to clipboard: ' + err));
+                });
+
+                // Reset copy success message when generating new letter
+                document.getElementById('coverLetterForm').addEventListener('submit', () => {
+                    const copySuccess = document.getElementById('copySuccess');
+                    copySuccess.style.display = 'none';
+                    copySuccess.classList.remove('show');
+                });
+            </script>
+</body>
+
+</html>
